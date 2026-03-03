@@ -3,79 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>بوابة استخراج أكواد ستيم</title>
+    <title>متجر HN - بوابة الأكواد</title>
     <script src="https://cdn.jsdelivr.net/npm/steam-totp-js@1.0.1/dist/steam-totp.min.js"></script>
     <style>
-        :root { --main-bg: #1b2838; --card-bg: #2a475e; --blue: #66c0f4; --text: #c7d5e0; }
-        body { background: var(--main-bg); color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: var(--card-bg); padding: 40px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.5); width: 90%; max-width: 400px; text-align: center; }
-        h2 { color: var(--blue); margin-bottom: 10px; }
-        input { width: 100%; padding: 12px; margin: 20px 0; border-radius: 8px; border: 1px solid #16202d; background: #101822; color: white; box-sizing: border-box; font-size: 16px; }
-        button { width: 100%; padding: 12px; background: var(--blue); border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        button:hover { background: #4faadb; }
-        #result { margin-top: 30px; }
-        .code { font-size: 50px; font-weight: bold; letter-spacing: 8px; color: #fff; text-shadow: 0 0 10px var(--blue); }
-        .timer { margin-top: 15px; font-size: 14px; color: var(--blue); }
+        :root { --main-teal: #1994a4; --main-gray: #b1b1b3; --dark-bg: #101822; --overlay-color: rgba(16, 24, 34, 0.85); }
+        body, html { height: 100%; margin: 0; font-family: sans-serif; display: flex; justify-content: center; align-items: center; color: white; overflow: hidden; }
+        .bg-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-image: url('pattern.png'); background-repeat: repeat; filter: blur(5px); transform: scale(1.1); z-index: -2; }
+        .bg-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--overlay-color); z-index: -1; }
+        .card { background: rgba(42, 71, 94, 0.6); padding: 30px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.7); width: 90%; max-width: 400px; text-align: center; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); z-index: 1; }
+        .store-logo { max-width: 180px; margin-bottom: 15px; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 2px solid #16202d; background: var(--dark-bg); color: white; box-sizing: border-box; font-size: 16px; text-align: center; }
+        button { width: 100%; padding: 14px; background: var(--main-teal); border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
+        #result { margin-top: 25px; display: none; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; }
+        .code { font-size: 55px; font-weight: bold; letter-spacing: 8px; text-shadow: 0 0 15px var(--main-teal); }
+        .attempts { font-size: 12px; color: #ff4d4d; margin-top: 10px; }
     </style>
 </head>
 <body>
+    <div class="bg-container"></div>
+    <div class="bg-overlay"></div>
+    <div class="card">
+        <img src="logo.png" alt="HN Logo" class="store-logo">
+        <p>أدخل رقم الطلب لاستخراج الكود</p>
+        
+        <input type="text" id="orderInput" placeholder="رقم الطلب">
+        <button onclick="checkAndFetch()">استخراج الكود</button>
 
-<div class="card">
-    <h2>مولد أكواد 2FA</h2>
-    <p style="color: var(--text)">أدخل اسم حسابك للحصول على كود الدخول</p>
-    
-    <input type="text" id="userInput" placeholder="مثال: Steam_User_01">
-    <button onclick="fetchAndGenerate()">استخراج الكود</button>
-
-    <div id="result" style="display:none;">
-        <div class="code" id="steamCode">-----</div>
-        <div class="timer" id="timer">تحديث خلال 30 ثانية...</div>
+        <div id="result">
+            <div class="code" id="steamCode">-----</div>
+            <div id="attemptsText" class="attempts"></div>
+            <div class="timer" id="timer" style="font-size: 14px; margin-top: 10px; color: var(--main-gray);"></div>
+        </div>
     </div>
-</div>
 
-<script>
-    // ⚠️ ضع رابط الـ CSV الذي نسخته من جوجل هنا
-    const googleSheetCSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSdht6CoTy4Ldy3IguEeGB3c4lHKjnorQwyJe0D6BWG10t9D21BB-Q_-JZilVd8m6aslgNMYy93u2Yi/pub?output=csv";
+    <script>
+        const googleSheetCSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSdht6CoTy4Ldy3IguEeGB3c4lHKjnorQwyJe0D6BWG10t9D21BB-Q_-JZilVd8m6aslgNMYy93u2Yi/pub?output=csv";
 
-    async function fetchAndGenerate() {
-        const user = document.getElementById('userInput').value.trim().toLowerCase();
-        if (!user) return alert("فضلاً أدخل اسم المستخدم");
+        async function checkAndFetch() {
+            const orderId = document.getElementById('orderInput').value.trim();
+            if (!orderId) return alert("فضلاً أدخل رقم الطلب");
 
-        try {
-            const response = await fetch(googleSheetCSV);
-            const data = await response.text();
-            const rows = data.split("\n").slice(1); // تجاهل العنوان
-            
-            let secret = null;
-            rows.forEach(row => {
-                const cols = row.split(",");
-                if (cols[0] && cols[0].trim().toLowerCase() === user) {
-                    secret = cols[1].trim();
-                }
-            });
+            // نظام الحماية: التحقق من عدد المرات في متصفح العميل
+            let attempts = localStorage.getItem('attempts_' + orderId) || 0;
+            attempts = parseInt(attempts);
 
-            if (secret) {
-                showCode(secret);
-            } else {
-                alert("الحساب غير موجود! تأكد من الاسم أو تواصل مع الدعم.");
+            if (attempts >= 3) {
+                return alert("عذراً، لقد استنفدت الحد الأقصى (3 مرات) لاستخراج الكود لهذا الطلب.");
             }
-        } catch (err) {
-            alert("خطأ في الاتصال بقاعدة البيانات!");
+
+            try {
+                const response = await fetch(googleSheetCSV);
+                const data = await response.text();
+                const rows = data.split("\n").slice(1); 
+                
+                let secret = null;
+                rows.forEach(row => {
+                    const cols = row.split(",");
+                    if (cols[0]?.trim() === orderId) {
+                        secret = cols[2]?.trim(); // يأخذ السر من العمود الثالث C
+                    }
+                });
+
+                if (secret) {
+                    // زيادة عدد المحاولات وحفظها
+                    attempts++;
+                    localStorage.setItem('attempts_' + orderId, attempts);
+                    
+                    document.getElementById('result').style.display = 'block';
+                    document.getElementById('attemptsText').innerText = `محاولاتك المستخدمة: ${attempts} من 3`;
+                    showCode(secret);
+                } else {
+                    alert("رقم الطلب غير موجود!");
+                }
+            } catch (err) {
+                alert("خطأ في الاتصال!");
+            }
         }
-    }
 
-    function showCode(secret) {
-        document.getElementById('result').style.display = 'block';
-        const update = () => {
-            const code = SteamTotp.generateAuthCode(secret);
-            document.getElementById('steamCode').innerText = code;
-            let seconds = 30 - (Math.floor(Date.now() / 1000) % 30);
-            document.getElementById('timer').innerText = `يتغير الكود بعد: ${seconds} ثانية`;
-        };
-        update();
-        setInterval(update, 1000);
-    }
-</script>
-
+        function showCode(secret) {
+            const update = () => {
+                const code = SteamTotp.generateAuthCode(secret);
+                document.getElementById('steamCode').innerText = code;
+                let seconds = 30 - (Math.floor(Date.now() / 1000) % 30);
+                document.getElementById('timer').innerText = `يتغير الكود خلال: ${seconds} ثانية`;
+            };
+            update();
+            if (window.timerInterval) clearInterval(window.timerInterval);
+            window.timerInterval = setInterval(update, 1000);
+        }
+    </script>
 </body>
 </html>
