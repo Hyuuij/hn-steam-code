@@ -3,31 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>متجر HN - بوابة الأكواد</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/steam-totp-js@1.0.1/dist/steam-totp.min.js"></script>
+    <title>بوابة ستيم جارد</title>
+    <script src="https://unpkg.com/@otplib/preset-browser@^12.0.0/buffer.js"></script>
+    <script src="https://unpkg.com/@otplib/preset-browser@^12.0.0/index.js"></script>
+    <style>
+        :root { --teal: #1994a4; --dark: #101822; }
+        body { margin: 0; background: var(--dark); color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .bg { position: fixed; width: 100%; height: 100%; background: url('pattern.png') repeat; filter: blur(8px); z-index: -1; }
+        .card { background: rgba(42, 71, 94, 0.9); padding: 30px; border-radius: 20px; text-align: center; width: 90%; max-width: 400px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        .logo { max-width: 150px; margin-bottom: 20px; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: none; background: #0b1118; color: white; box-sizing: border-box; text-align: center; font-size: 16px; }
+        button { width: 100%; padding: 12px; background: var(--teal); border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; }
+        .result { margin-top: 25px; display: none; }
+        .code { font-size: 50px; font-weight: bold; letter-spacing: 5px; color: #fff; text-shadow: 0 0 10px var(--teal); }
+    </style>
 </head>
 <body>
-    <div class="bg-pattern"></div>
-    <div class="overlay"></div>
-
+    <div class="bg"></div>
     <div class="card">
-        <img src="logo.png" alt="Logo" class="logo">
-        <h2>بوابة استخراج الأكواد</h2>
-        <p>أدخل بيانات الطلب للحصول على كود Steam Guard</p>
-
-        <input type="text" id="orderInput" placeholder="رقم الطلب (Order ID)">
-        <input type="text" id="userInput" placeholder="اسم الحساب (Username)">
-        
-        <button onclick="fetchAndGenerate()">استخراج الكود الآن</button>
-
-        <div id="resultArea" class="result-container">
-            <div id="steamCode" class="code-display">-----</div>
-            <div id="attemptsText" class="info-text"></div>
-            <div id="timerText" class="info-text"></div>
+        <img src="logo.png" class="logo">
+        <h2>استخراج كود ستيم</h2>
+        <input type="text" id="orderID" placeholder="رقم الطلب (مثلاً: 244599954)">
+        <input type="text" id="user" placeholder="اسم الحساب (مثلاً: xenqorlav62)">
+        <button onclick="startProcess()">استخراج الكود الآن</button>
+        <div id="resArea" class="result">
+            <div id="steamCode" class="code">-----</div>
+            <p id="timer" style="font-size: 13px; color: #ccc; margin-top: 10px;"></p>
         </div>
     </div>
 
-    <script src="script.js"></script>
+<script>
+    // الرابط المباشر لجدولك
+    const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSdht6CoTy4Ldy3IguEeGB3c4lHKjnorQwyJe0D6BWG10t9D21BB-Q_-JZilVd8m6aslgNMYy93u2Yi/pub?output=csv";
+
+    async function startProcess() {
+        const orderVal = document.getElementById('orderID').value.trim();
+        const userVal = document.getElementById('user').value.trim().toLowerCase();
+
+        try {
+            const response = await fetch(csvUrl);
+            const text = await response.text();
+            const rows = text.split("\n").map(line => line.split(","));
+            
+            let sharedSecret = null;
+            // البحث عن السر في العمود C بناءً على مدخلاتك
+            for(let i=1; i<rows.length; i++) {
+                if(rows[i][0]?.trim() === orderVal && rows[i][1]?.trim().toLowerCase() === userVal) {
+                    sharedSecret = rows[i][2]?.trim();
+                }
+            }
+
+            if(sharedSecret) {
+                document.getElementById('resArea').style.display = 'block';
+                generateSteamCode(sharedSecret);
+            } else {
+                alert("لم يتم العثور على البيانات! تأكد من رقم الطلب واسم الحساب.");
+            }
+        } catch(e) {
+            alert("خطأ في الاتصال بالجدول!");
+        }
+    }
+
+    function generateSteamCode(secret) {
+        const update = () => {
+            // منطق توليد أكواد ستيم (Steam Guard) باستخدام المكتبة الجديدة
+            try {
+                // تحويل السر إلى صيغة Base32 التي تفهمها المكتبة
+                const code = otplib.authenticator.generate(secret);
+                document.getElementById('steamCode').innerText = code;
+                
+                let timeLeft = 30 - (Math.floor(Date.now() / 1000) % 30);
+                document.getElementById('timer').innerText = "يتغير الكود خلال: " + timeLeft + " ثانية";
+            } catch (err) {
+                console.error(err);
+                document.getElementById('steamCode').innerText = "ERROR";
+            }
+        };
+
+        update();
+        setInterval(update, 1000);
+    }
+</script>
 </body>
 </html>
